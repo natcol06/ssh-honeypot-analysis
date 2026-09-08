@@ -1,0 +1,4 @@
+data/cowrie.json
+__pycache__/
+*.db
+.venv/

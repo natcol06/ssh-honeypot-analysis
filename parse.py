@@ -1,6 +1,7 @@
 import json
 import glob
 from collections import Counter
+from datetime import datetime
 
 
 def load_events(pattern="data/cowrie.json*"):
@@ -31,6 +32,9 @@ def show(title, counter, total=None, limit=15):
     for name, count in counter.most_common(limit):
         if isinstance(name, tuple):
             name = " / ".join(name)
+        name = " ".join(str(name).split())
+        if len(name) > 100:
+            name = name[:97] + "..."
         label = repr(name) if name == "" else name
         if total:
             pct = 100 * count / total
@@ -38,8 +42,19 @@ def show(title, counter, total=None, limit=15):
         else:
             print(f"  {count:>7,}  {label}")
 
+def parse_time(value):
+    """Cowrie writes ISO timestamps ending in Z."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 def main():
+    
+    MY_IPS = {"208.71.27.71"}
+    
     total = 0
     event_types = Counter()
     unique_ips = set()
@@ -49,6 +64,9 @@ def main():
     commands = Counter()
     ip_attempts = Counter()
     clients = Counter()
+    by_hour = Counter()
+    by_day = Counter()
+    first_seen = {}
 
     for event in load_events():
         total += 1
@@ -56,6 +74,8 @@ def main():
         event_types[eid] += 1
 
         ip = event.get("src_ip")
+        if ip in MY_IPS:
+            continue
         if ip:
             unique_ips.add(ip)
 
@@ -67,6 +87,13 @@ def main():
             credentials[(user, pwd)] += 1
             if ip:
                 ip_attempts[ip] += 1
+
+            ts = parse_time(event.get("timestamp"))
+            if ts:
+                by_hour[ts.strftime("%Y-%m-%d %H:00")] += 1
+                by_day[ts.strftime("%Y-%m-%d")] += 1
+                if ip and (ip not in first_seen or ts < first_seen[ip]):
+                    first_seen[ip] = ts
 
         elif eid == "cowrie.command.input":
             cmd = event.get("input", "").strip()
@@ -101,6 +128,35 @@ def main():
           f"({100*top_two/logins:.1f}%)")
     print(f"Distinct /24 networks: {len(subnets):,}")
     print(f"Unique IPs: {len(unique_ips):,}")
+    
+    print("\nAttempts per day")
+    print("----------------")
+    for day in sorted(by_day):
+        bar = "#" * int(40 * by_day[day] / max(by_day.values()))
+        print(f"  {day}  {by_day[day]:>6,}  {bar}")
+
+    print("\nBusiest hours")
+    print("-------------")
+    for hour, count in by_hour.most_common(12):
+        print(f"  {hour}  {count:>6,}")
+
+    if first_seen:
+        earliest = min(first_seen.values())
+        latest = max(first_seen.values())
+        span = latest - earliest
+        print(f"\nFirst login attempt:  {earliest}")
+        print(f"Last login attempt:   {latest}")
+        print(f"Collection span:      {span}")
+    
+    burst_hours = {"2026-09-08 05:00", "2026-09-08 06:00", "2026-09-08 07:00"}
+    burst_ips = Counter()
+    for event in load_events():
+        if not event.get("eventid", "").startswith("cowrie.login"):
+            continue
+        ts = parse_time(event.get("timestamp"))
+        if ts and ts.strftime("%Y-%m-%d %H:00") in burst_hours:
+            burst_ips[event.get("src_ip")] += 1
+    show("Who drove the Sept 8 05:00-07:00 burst", burst_ips, limit=10)
     
 if __name__ == "__main__":
     main()

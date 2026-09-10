@@ -96,5 +96,11 @@ def main():
     show("SSH client banners", clients)
     show("Top commands run by attackers", commands, limit=25)
 
+    top_two = sum(c for _, c in subnets.most_common(2))
+    print(f"\nTop 2 networks: {top_two:,} of {logins:,} attempts "
+          f"({100*top_two/logins:.1f}%)")
+    print(f"Distinct /24 networks: {len(subnets):,}")
+    print(f"Unique IPs: {len(unique_ips):,}")
+    
 if __name__ == "__main__":
     main()

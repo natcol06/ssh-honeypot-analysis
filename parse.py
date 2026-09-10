@@ -158,5 +158,21 @@ def main():
             burst_ips[event.get("src_ip")] += 1
     show("Who drove the Sept 8 05:00-07:00 burst", burst_ips, limit=10)
     
+    NOISY = "120.25.246.192"
+    clean_by_day = Counter()
+    for event in load_events():
+        if not event.get("eventid", "").startswith("cowrie.login"):
+            continue
+        if event.get("src_ip") == NOISY:
+            continue
+        ts = parse_time(event.get("timestamp"))
+        if ts:
+            clean_by_day[ts.strftime("%Y-%m-%d")] += 1
+
+    print(f"\nAttempts per day, excluding {NOISY}")
+    print("-" * 40)
+    for day in sorted(clean_by_day):
+        print(f"  {day}  {clean_by_day[day]:>6,}")
+    
 if __name__ == "__main__":
     main()

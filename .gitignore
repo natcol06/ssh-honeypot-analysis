@@ -1,4 +1,6 @@
-data/cowrie.json
+data/cowrie.json*
+!data/sample.json
+report.txt
 __pycache__/
 *.db
 .venv/

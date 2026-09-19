@@ -159,6 +159,15 @@ Reads every rotated Cowrie log in `data/`, so it works unchanged as
 files accumulate. A 200-line sample is committed so the tool runs on a
 fresh clone.
 
+## Dashboard
+
+An interactive dashboard over the same data, backed by SQLite.
+
+    python load_db.py       # loads the logs into honeypot.db
+    streamlit run app.py    # opens the dashboard
+
+![Dashboard](images/dashboard-networks.png)
+
 ## Limitations
 
 - One vantage point, one IP address, one 47-hour window. Nothing here

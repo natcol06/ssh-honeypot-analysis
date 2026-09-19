@@ -166,7 +166,9 @@ An interactive dashboard over the same data, backed by SQLite.
     python load_db.py       # loads the logs into honeypot.db
     streamlit run app.py    # opens the dashboard
 
-![Dashboard](images/dashboard-networks.png)
+![Dashboard headline numbers and network breakdown](images/dashboard.png)
+
+![Credentials attempted](images/credentials.png)
 
 ## Limitations
 

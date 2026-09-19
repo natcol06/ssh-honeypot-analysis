@@ -19,7 +19,7 @@ Collected over 47 hours, 2026-09-08 to 2026-09-10:
 | Login attempts             | 14,422                                   |
 | Attacker commands captured | 14,320 (98% of them fingerprinting)      |
 | Unique source hosts        | 624 connected, 389 attempted a login     |
-| Distinct /24 networks      | 360                                      |
+| Distinct /24 networks      | 553 connected, 360 attempted a login     |
 
 235 of the 624 hosts connected, fingerprinted the service, and left
 without ever trying a password. Over a third of the traffic reaching the

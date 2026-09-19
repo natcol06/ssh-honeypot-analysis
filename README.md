@@ -22,7 +22,7 @@ Collected over 47 hours, 2026-09-08 to 2026-09-10:
 
 ## Findings
 
-### 1. 624 hosts, but two networks did 88.5% of the work
+### 1. 623 hosts, but two networks did 88.5% of the work
 
 Counted per host, the traffic looks diffuse. Counted per /24, it
 collapses:

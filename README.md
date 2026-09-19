@@ -1,8 +1,9 @@
+[README_updated.md](https://github.com/user-attachments/files/32424584/README_updated.md)
 # SSH Honeypot Analysis
 
-A Cowrie SSH honeypot on a public VPS, plus a Python tool that turns its
-logs into findings about who attacks an unknown machine, how fast, and
-what they do once they get in.
+A Cowrie SSH honeypot on a public VPS, plus a Python tool and a SQL-backed
+dashboard that turn its logs into findings about who attacks an unknown
+machine, how fast, and what they do once they get in.
 
 All data was collected first-hand from a machine I own. Strictly
 observational: inbound traffic only, no scanning, no active response, no
@@ -12,34 +13,40 @@ contact with any attacker infrastructure.
 
 Collected over 47 hours, 2026-09-08 to 2026-09-10:
 
-| | |
-|---|---|
-| Time to first scan | 5 min 4 sec after the host went live |
-| Login attempts | 14,422 |
-| Attacker commands captured | 14,320 (mostly automated fingerprinting) |
-| Unique source hosts | 623 |
-| Distinct /24 networks | 360 |
+|                            |                                          |
+| -------------------------- | ---------------------------------------- |
+| Time to first scan         | 5 min 4 sec after the host went live     |
+| Login attempts             | 14,422                                   |
+| Attacker commands captured | 14,320 (98% of them fingerprinting)      |
+| Unique source hosts        | 624 connected, 389 attempted a login     |
+| Distinct /24 networks      | 360                                      |
+
+235 of the 624 hosts connected, fingerprinted the service, and left
+without ever trying a password. Over a third of the traffic reaching the
+port was reconnaissance rather than attack.
 
 ## Findings
 
-### 1. 623 hosts, but two networks did 88.5% of the work
+### 1. 624 hosts, but two networks did 88.5% of the work
 
 Counted per host, the traffic looks diffuse. Counted per /24, it
 collapses:
 
-| Network | Attempts | Share |
-|---|---|---|
-| 109.160.32.0/24 | 6,771 | 46.9% |
-| 120.25.246.0/24 | 5,994 | 41.6% |
-| all 358 others | 1,657 | 11.5% |
+| Network         | Attempts | Share |
+| --------------- | -------- | ----- |
+| 109.160.32.0/24 | 6,771    | 46.9% |
+| 120.25.246.0/24 | 5,994    | 41.6% |
+| all others      | 1,657    | 11.5% |
 
-Thirteen hosts in `109.160.32.0/24` each made close to exactly 500
-attempts. Identical per-host volume is the signature of a controller
-splitting one job evenly across a fleet, not thirteen independent
-attackers.
+Fourteen hosts in `109.160.32.0/24` split that work. Eight of them
+stopped at exactly 500 attempts, and two more matched each other at
+exactly 784. Identical per-host totals are the signature of a controller
+handing out equal shares of one job, not fourteen independent attackers.
+The three smallest hosts (281, 157, and 54 attempts) were most likely
+still working when collection stopped.
 
 This is an argument against per-IP blocklists. Blocking by host treats
-one operation as thirteen problems.
+one operation as fourteen problems.
 
 ### 2. The largest single source was not attacking
 
@@ -70,10 +77,10 @@ once and finished.
 
 Excluding that host:
 
-| Day | Attempts |
-|---|---|
-| 2026-09-08 | 3,170 |
-| 2026-09-09 | 4,628 |
+| Day        | Attempts |
+| ---------- | -------- |
+| 2026-09-08 | 3,170    |
+| 2026-09-09 | 4,628    |
 
 Attack volume rose 46% from day one to day two. A new host is not
 attacked hardest on arrival; it is found, catalogued, and hit harder as
@@ -101,17 +108,38 @@ strings, so the list was built from observed accounts somewhere upstream.
 Passwords were the expected weak set: `123456` (2.9%), `1234`, `123`,
 `12345`, `111111`.
 
-### 5. What the malware actually did
+### 5. Almost every visitor asked what the machine was
 
-Fewer than 30 sessions did anything beyond fingerprinting. What follows
-is drawn from those.
+Of the 14,320 commands captured, about 98% were fingerprinting:
 
+| Command                    | Times |
+| -------------------------- | ----- |
+| `uname` in some form       | 8,094 |
+| the `echo ok` check above  | 5,994 |
+
+Before spending a payload, a bot wants to know the kernel, the
+architecture, and whether the shell is real. The rest of this section
+covers the roughly 229 commands that did something else.
+
+### 6. What the malware actually did
+
+Multi-step attacks arrived as a single long input, not a typed sequence.
+Exactly one session in the whole dataset ran more than one command. The
+rest piped an entire script in at once, which is why the interesting
+activity hides inside a handful of very long commands.
+
+- **One script, many networks.** An 11,956-character capability-profiling
+  script ran 208 times, byte for byte identical, from hosts in unrelated
+  networks. It fingerprinted CPU model, core count, and GPU presence,
+  then tested whether it could write and execute a file. GPU detection
+  indicates mining suitability assessment. The same toolkit is in
+  circulation across separate operators.
+- **Staged payload retrieval.** An 874-character script wrote its own SSH
+  private key to disk, then used `scp` to pull a second stage from a
+  hardcoded host, with `wget` and `curl` as fallbacks. It ran 10 times.
 - **Botnet recruitment.** Two sessions dropped a binary named `sshd` and
   launched it with roughly 50 IP addresses as arguments, turning the
   host into a node attacking those targets.
-- **Staged payload retrieval.** One session wrote its own SSH private
-  key to disk, then used `scp` to pull a second-stage script from a
-  hardcoded host, with `wget` and `curl` as fallbacks.
 - **Credential and message theft.** One session enumerated Telegram
   desktop session data, SMS gateway devices, and modem configuration
   paths.
@@ -119,22 +147,18 @@ is drawn from those.
   RouterOS command. The bot believed it had landed on a router.
 - **Competitor checks.** Several ran `ps | grep '[Mm]iner'` before doing
   anything else, checking for rival cryptominers already installed.
-- **Capability profiling.** A 200-line shell script fingerprinted CPU
-  model, core count, and GPU presence, then tested whether it could
-  write and execute a file. GPU detection indicates mining suitability
-  assessment.
 
 One session searched for `D877F783D5D3EF8C`, a marker associated with
 the Dota/Outlaw SSH botnet family.
 
-### 6. Client tooling was almost entirely one library
+### 7. Client tooling was almost entirely one library
 
-| Banner | Sessions |
-|---|---|
-| SSH-2.0-Go | 14,590 |
-| SSH-2.0-PuTTY_Release_0.84 | 36 |
-| SSH-2.0-OpenSSH-keyscan | 15 |
-| SSH-2.0-libssh2_1.11.1 | 14 |
+| Banner                       | Sessions |
+| ---------------------------- | -------- |
+| SSH-2.0-Go                   | 14,590   |
+| SSH-2.0-PuTTY\_Release\_0.84 | 36       |
+| SSH-2.0-OpenSSH-keyscan      | 15       |
+| SSH-2.0-libssh2\_1.11.1      | 14       |
 
 A handful of connections were not SSH at all, including HTTP requests
 and TLS handshakes aimed at the port. Some research scanners identified
@@ -161,14 +185,24 @@ fresh clone.
 
 ## Dashboard
 
-An interactive dashboard over the same data, backed by SQLite.
+The same data, loaded into SQLite and served as an interactive dashboard.
+Every number on the page comes from a SQL query, including a box for
+running your own.
 
-    python load_db.py       # loads the logs into honeypot.db
-    streamlit run app.py    # opens the dashboard
+```
+pip install -r requirements.txt
+python load_db.py       # builds honeypot.db from the logs in data/
+streamlit run app.py    # opens the dashboard at localhost:8501
+```
 
-![Dashboard headline numbers and network breakdown](images/dashboard.png)
+`load_db.py` splits the raw events into three tables (`sessions`,
+`logins`, `commands`). `queries.sql` holds the queries behind the
+findings above, and `run_queries.py` prints them without starting the
+dashboard.
 
-![Credentials attempted](images/credentials.png)
+![Headline numbers and the per-network breakdown](images/dashboard-networks.png)
+
+![Usernames and passwords attempted](images/dashboard-credentials.png)
 
 ## Limitations
 
@@ -189,4 +223,4 @@ An interactive dashboard over the same data, backed by SQLite.
 - Per-network and per-country enrichment via ASN lookup
 - Detection rules for brute force bursts, password spraying, and
   credential reuse across hosts
-- Extended collection through late September.
+- Extended collection through late September

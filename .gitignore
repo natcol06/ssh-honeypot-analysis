@@ -13,4 +13,4 @@ cpp/simdjson.cpp
 cpp/*.exe
 cpp/parse
 cpp/parse_fast
-cpp/hello*
+cpp/hello*alerts.json

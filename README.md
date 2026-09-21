@@ -256,12 +256,11 @@ react without reading the JSON.
 The first version of these rules produced 237 alerts from the same data.
 The information was identical; the presentation made it unusable.
 
-| Version                        | Alerts |
-| ------------------------------ | ------ |
-| first version, capped at 5     | 87     |
-| matches per marker | 237       |        |
-| one alert per session          | 208    |
-| grouped by what was run        | 21     |
+| Version                                        | Alerts |
+| ---------------------------------------------- | ------ |
+| first version, capped at 5 matches per marker  | 87     |
+| one alert per session                          | 237    |
+| grouped by what was run                        | 21     |
 
 The fix was to group sessions by a fingerprint of the commands they ran,
 so sessions replaying the same script collapse into one alert carrying the

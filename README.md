@@ -211,6 +211,76 @@ time was JSON parsing, and switching libraries made the final version
 3.2x faster than Python on the same 117,248 lines. Details and build
 steps in [cpp/README.md](cpp/README.md).
 
+## Detection rules
+
+`detect.py` runs five rules against the database and writes alerts to
+`alerts.json`. Each rule is a SQL query plus a severity, so adding one
+means writing a query rather than changing the program.
+
+```
+python detect.py                       # all rules
+python detect.py --min-severity high   # only the serious ones
+python detect.py --burst-attempts 300  # tune a threshold
+```
+
+It exits with code 1 when anything critical fires, so a scheduled job can
+react without reading the JSON.
+
+| Rule                     | What it looks for                                      | Severity |
+| ------------------------ | ------------------------------------------------------ | -------- |
+| `payload_activity`       | a session that downloaded, unpacked, or launched a file | critical |
+| `brute_force_burst`      | one host making 100+ attempts in a 10 minute window     | high, medium |
+| `coordinated_network`    | 3+ hosts in one /24 attacking together                  | high     |
+| `password_spray`         | 20+ usernames with 2 or fewer passwords each            | medium   |
+| `shared_credential_list` | one credential pair tried by 5+ unrelated hosts         | low      |
+
+### What it found
+
+21 alerts across the 47 hour dataset: 4 critical, 11 high, 5 medium, 1 low.
+
+- **One payload, eight hosts.** The same script ran in 208 sessions from
+  8 different hosts. Identical payloads across unrelated infrastructure
+  mean a shared toolkit rather than one operator.
+- **Download with fallbacks.** `130.12.180.51` ran `wget`, `curl`, and
+  `scp` across 10 sessions, three ways to fetch the same second stage in
+  case any one of them is missing on the target.
+- **Persistence attempts.** Two hosts ran `nohup`, which keeps a process
+  alive after the session closes.
+- **Sustained brute force.** `120.25.246.192` made 5,851 attempts across
+  19 windows, peaking at 355 in ten minutes.
+- **Spraying, not guessing.** `134.209.88.3` tried 98 usernames at 1.9
+  attempts each, the shape that stays under lockout thresholds.
+
+### Alert fatigue is a design problem
+
+The first version of these rules produced 237 alerts from the same data.
+The information was identical; the presentation made it unusable.
+
+| Version                        | Alerts |
+| ------------------------------ | ------ |
+| one alert per matching command | 237    |
+| grouped per session            | 208    |
+| grouped by what was run        | 21     |
+
+The fix was to group sessions by a fingerprint of the commands they ran,
+so sessions replaying the same script collapse into one alert carrying the
+session and host counts. Two other rules got the same treatment: brute
+force reports once per host with its window count, and the credential
+rule fires once with the worst offenders attached.
+
+A rule that fires 200 times for one event is worse than no rule, because
+people learn to scroll past it.
+
+### Limits
+
+- Thresholds are tuned to this dataset. Different traffic needs different
+  numbers, which is why they are all command line flags.
+- Rules run over the whole database at once, not on live traffic. Running
+  it on a schedule against fresh logs is the next step.
+- `payload_activity` matches on command text, so a payload that avoids
+  these markers goes unseen. It catches commodity malware, not a careful
+  attacker.
+
 ## Limitations
 
 - One vantage point, one IP address, one 47-hour window. Nothing here

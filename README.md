@@ -203,6 +203,14 @@ dashboard.
 
 ![Usernames and passwords attempted](images/dashboard-credentials.png)
 
+## C++ parser
+
+A C++ rewrite of the analysis, used to compare the two languages. The
+first attempt was 1.6x slower than Python; measuring showed 98% of the
+time was JSON parsing, and switching libraries made the final version
+3.2x faster than Python on the same 117,248 lines. Details and build
+steps in [cpp/README.md](cpp/README.md).
+
 ## Limitations
 
 - One vantage point, one IP address, one 47-hour window. Nothing here

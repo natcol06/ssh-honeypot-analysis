@@ -258,8 +258,9 @@ The information was identical; the presentation made it unusable.
 
 | Version                        | Alerts |
 | ------------------------------ | ------ |
-| one alert per matching command | 237    |
-| grouped per session            | 208    |
+| first version, capped at 5     | 87     |
+| matches per marker | 237       |        |
+| one alert per session          | 208    |
 | grouped by what was run        | 21     |
 
 The fix was to group sessions by a fingerprint of the commands they ran,
